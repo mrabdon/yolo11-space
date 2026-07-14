@@ -55,8 +55,8 @@ class RTSPStreamReader:
 # ==========================================
 
 # Replace with your actual RTSP credentials/addresses
-RTSP_URL_1 = "rtsp://username:password@ip_address_1:554/stream"
-RTSP_URL_2 = "rtsp://username:password@ip_address_2:554/stream"
+RTSP_URL_1 = "rtsp://admin:@ict2025@@192.168.1.3:554/stream"
+RTSP_URL_2 = "rtsp://admin:@ict2025@@192.168.1.11:554/stream"
 
 # 1. Initialize threaded streams
 stream1 = RTSPStreamReader(RTSP_URL_1)

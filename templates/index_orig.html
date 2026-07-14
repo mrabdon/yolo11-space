@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Parking Lot Dashboard</title>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --card-bg: #1e293b;
+            --text-color: #f8fafc;
+            --occupied-color: #ef4444;
+            --vacant-color: #10b981;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 2.5rem;
+            letter-spacing: -0.05em;
+        }
+
+        .header p {
+            color: #94a3b8;
+            margin-top: 5px;
+        }
+
+        .dashboard-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .card {
+            background-color: var(--card-bg);
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            transition: transform 0.2s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-2px);
+        }
+
+        .camera-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 15px;
+            border-bottom: 2px solid #334155;
+            padding-bottom: 8px;
+        }
+
+        .status-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .stat-box {
+            border-radius: 8px;
+            padding: 15px;
+            text-align: center;
+        }
+
+        .stat-box.occupied {
+            background-color: rgba(239, 68, 68, 0.15);
+            border: 1px solid var(--occupied-color);
+        }
+
+        .stat-box.vacant {
+            background-color: rgba(16, 185, 129, 0.15);
+            border: 1px solid var(--vacant-color);
+        }
+
+        .number {
+            font-size: 2.5rem;
+            font-weight: 800;
+            margin: 5px 0 0 0;
+        }
+
+        .label {
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #94a3b8;
+        }
+
+        .progress-bar-container {
+            background-color: #334155;
+            border-radius: 9999px;
+            height: 12px;
+            overflow: hidden;
+            margin-top: 15px;
+        }
+
+        .progress-bar {
+            height: 100%;
+            border-radius: 9999px;
+            transition: width 0.5s ease-in-out;
+        }
+
+        .stat-summary {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.9rem;
+            color: #94a3b8;
+            margin-top: 8px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h1>Smart Parking System</h1>
+        <p>Live AI Parking Occupancy Tracker</p>
+    </div>
+
+    <div class="dashboard-container">
+        <!-- Camera Stream 1 -->
+        <div class="card" id="cam1-card">
+            <div class="camera-title">🎥 Zone 1 Feed</div>
+            <div class="status-grid">
+                <div class="stat-box occupied">
+                    <div class="label">Occupied</div>
+                    <div class="number" id="cam1-occupied">0</div>
+                </div>
+                <div class="stat-box vacant">
+                    <div class="label">Vacant</div>
+                    <div class="number" id="cam1-vacant">0</div>
+                </div>
+            </div>
+            <div>
+                <span class="label">Occupancy Rate</span>
+                <div class="progress-bar-container">
+                    <div class="progress-bar" id="cam1-progress" style="width: 0%; background-color: var(--occupied-color);"></div>
+                </div>
+                <div class="stat-summary">
+                    <span id="cam1-percentage">0% Full</span>
+                    <span id="cam1-total">Total Spots: 0</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Camera Stream 2 -->
+        <div class="card" id="cam2-card">
+            <div class="camera-title">🎥 Zone 2 Feed</div>
+            <div class="status-grid">
+                <div class="stat-box occupied">
+                    <div class="label">Occupied</div>
+                    <div class="number" id="cam2-occupied">0</div>
+                </div>
+                <div class="stat-box vacant">
+                    <div class="label">Vacant</div>
+                    <div class="number" id="cam2-vacant">0</div>
+                </div>
+            </div>
+            <div>
+                <span class="label">Occupancy Rate</span>
+                <div class="progress-bar-container">
+                    <div class="progress-bar" id="cam2-progress" style="width: 0%; background-color: var(--occupied-color);"></div>
+                </div>
+                <div class="stat-summary">
+                    <span id="cam2-percentage">0% Full</span>
+                    <span id="cam2-total">Total Spots: 0</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function updateDashboard() {
+            fetch('/api/parking')
+                .then(response => response.json())
+                .then(data => {
+                    // Update Camera 1
+                    updateCameraUI('cam1', data.camera_1);
+                    // Update Camera 2
+                    updateCameraUI('cam2', data.camera_2);
+                })
+                .catch(error => console.error('Error fetching stats:', error));
+        }
+
+        function updateCameraUI(prefix, stats) {
+            document.getElementById(`${prefix}-occupied`).innerText = stats.occupied;
+            document.getElementById(`${prefix}-vacant`).innerText = stats.available;
+            document.getElementById(`${prefix}-total`).innerText = `Total Spots: ${stats.total}`;
+
+            // Calculate percentage
+            let percent = 0;
+            if (stats.total > 0) {
+                percent = Math.round((stats.occupied / stats.total) * 100);
+            }
+            
+            document.getElementById(`${prefix}-percentage`).innerText = `${percent}% Full`;
+            
+            const progressBar = document.getElementById(`${prefix}-progress`);
+            progressBar.style.width = `${percent}%`;
+
+            // Dynamic Progress Bar Color shifting from Green -> Yellow -> Red
+            if (percent < 50) {
+                progressBar.style.backgroundColor = '#10b981'; // Green
+            } else if (percent < 85) {
+                progressBar.style.backgroundColor = '#f59e0b'; // Amber
+            } else {
+                progressBar.style.backgroundColor = '#ef4444'; // Red
+            }
+        }
+
+        // Fetch data every 1 second (1000ms)
+        setInterval(updateDashboard, 1000);
+        updateDashboard(); // Run once immediately on load
+    </script>
+</body>
+</html>
