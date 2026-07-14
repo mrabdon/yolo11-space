@@ -1,0 +1,13 @@
+# PyTorch weights
+*.pt
+*.pth
+
+# Datasets and runs
+datasets/
+runs/
+
+# Python environments and cache
+__pycache__/
+.venv/
+venv/
+.env
