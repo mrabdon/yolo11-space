@@ -57,10 +57,14 @@ class RTSPStreamReader:
 # Replace with your actual RTSP credentials/addresses
 RTSP_URL_1 = "rtsp://admin:@ict2025@@192.168.1.3:554/stream"
 RTSP_URL_2 = "rtsp://admin:@ict2025@@192.168.1.11:554/stream"
+RTSP_URL_3 = "rtsp://admin:@ict2025@@192.168.1.6:554/stream"
+RTSP_URL_4 = "rtsp://admin:@ict2025@@192.168.1.12:554/stream"
 
 # 1. Initialize threaded streams
 stream1 = RTSPStreamReader(RTSP_URL_1)
 stream2 = RTSPStreamReader(RTSP_URL_2)
+stream3 = RTSPStreamReader(RTSP_URL_3)
+stream4 = RTSPStreamReader(RTSP_URL_4)
 
 # 2. Initialize separate parking managers (one for each unique camera view)
 parking_manager_s1 = ParkingManagement(
@@ -74,6 +78,16 @@ parking_manager_s2 = ParkingManagement(
     classes=[2],
     json_file="bounding_boxes_s2.json",  # Specific map for Camera 2
 )
+parking_manager_s3 = ParkingManagement(
+    model="yolo11s.pt",
+    classes=[2],
+    json_file="bounding_boxes_aeb1.json",  # Specific map for Camera 2
+)
+parking_manager_s4 = ParkingManagement(
+    model="yolo11s.pt",
+    classes=[2],
+    json_file="bounding_boxes_aeb2.json",  # Specific map for Camera 2
+)
 
 print("Starting streams... Press ESC on video windows to close.")
 
@@ -82,6 +96,8 @@ try:
         # Retrieve the most recent frames from memory buffer (no network wait)
         ret1, frame1 = stream1.read()
         ret2, frame2 = stream2.read()
+        ret3, frame3 = stream3.read()
+        ret4, frame4 = stream4.read()
 
         # Process stream 1 if frame is ready
         if ret1 and frame1 is not None:
@@ -94,6 +110,16 @@ try:
             im02 = cv2.resize(frame2, (1080, 600))
             processed_s2 = parking_manager_s2.process_data(im02)
             cv2.imshow("RTSP Camera 2", processed_s2)
+        # Process stream 2 if frame is ready
+        if ret3 and frame3 is not None:
+            im03 = cv2.resize(frame3, (1080, 600))
+            processed_s3 = parking_manager_s3.process_data(im03)
+            cv2.imshow("RTSP Camera 3", processed_s3)
+        # Process stream 2 if frame is ready
+        if ret4 and frame4 is not None:
+            im04 = cv2.resize(frame4, (1080, 600))
+            processed_s4 = parking_manager_s4.process_data(im04)
+            cv2.imshow("RTSP Camera 4", processed_s4)
 
         # Break loop if ESC is pressed
         if cv2.waitKey(1) & 0xFF == 27:

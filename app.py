@@ -10,17 +10,33 @@ from parking import ParkingManagement
 # ==========================================
 app = Flask(__name__)
 
-# Global storage for live occupancy metrics
-parking_stats = {
-    "camera_1": {"occupied": 0, "available": 0, "total": 0},
-    "camera_2": {"occupied": 0, "available": 0, "total": 0},
-    "total_lot": {"occupied": 0, "available": 0, "total": 0}
+# Combined global storage for simplified API retrieval
+parking_data = {
+    "lot": {
+        "camera_1": {"occupied": 0, "available": 0, "total": 0},
+        "camera_2": {"occupied": 0, "available": 0, "total": 0},
+        "total": {"occupied": 0, "available": 0, "total": 0}
+    },
+    "aeb": {
+        "camera_aeb1": {"occupied": 0, "available": 0, "total": 0},
+        "camera_aeb2": {"occupied": 0, "available": 0, "total": 0},
+        "total": {"occupied": 0, "available": 0, "total": 0}
+    },
+      "gym": {
+        "camera_gym1": {"occupied": 0, "available": 0, "total": 0},
+        "camera_gym2": {"occupied": 0, "available": 0, "total": 0},
+        "total": {"occupied": 0, "available": 0, "total": 0}
+    }
 }
 
 # Separate global thread-safe buffers to hold individual video frames
 output_frames = {
     "camera_1": None,
-    "camera_2": None
+    "camera_2": None,
+    "camera_aeb1": None,
+    "camera_aeb2": None,
+    "camera_gym1": None,
+    "camera_gym2": None
 }
 frame_lock = threading.Lock()
 
@@ -30,7 +46,7 @@ def index():
 
 @app.route("/api/parking")
 def api_parking():
-    return jsonify(parking_stats)
+    return jsonify(parking_data)
 
 def generate_mjpeg_stream(camera_id):
     """Generates JPEG frame byte-streams for browser rendering based on camera_id."""
@@ -55,7 +71,7 @@ def generate_mjpeg_stream(camera_id):
 @app.route("/video_feed/<camera_id>")
 def video_feed(camera_id):
     """Streaming route tailored for individual camera_ids."""
-    if camera_id not in ["camera_1", "camera_2"]:
+    if camera_id not in ["camera_1", "camera_2", "camera_aeb1", "camera_aeb2", "camera_gym1",  "camera_gym2"]:
         return "Camera not found", 404
     return Response(generate_mjpeg_stream(camera_id),
                     mimetype='multipart/x-mixed-replace; boundary=frame')
@@ -115,15 +131,35 @@ def main_cv_loop():
 
     RTSP_URL_1 = "rtsp://admin:%40ict2025%40@192.168.1.3:554/stream?rtsp_transport=tcp"
     RTSP_URL_2 = "rtsp://admin:%40ict2025%40@192.168.1.11:554/stream?rtsp_transport=tcp"
+    RTSP_AEB_1 = "rtsp://admin:%40ict2025%40@192.168.1.6:554/stream?rtsp_transport=tcp"
+    RTSP_AEB_2 = "rtsp://admin:%40ict2025%40@192.168.1.12:554/stream?rtsp_transport=tcp"
+    RTSP_GYM_1 = "rtsp://admin:%40ict2025%40@192.168.1.4:554/stream?rtsp_transport=tcp"
+    RTSP_GYM_2 = "rtsp://admin:%40ict2025%40@192.168.1.5:554/stream?rtsp_transport=tcp"
 
     stream1 = RTSPStreamReader(RTSP_URL_1)
     stream2 = RTSPStreamReader(RTSP_URL_2)
+    stream3 = RTSPStreamReader(RTSP_AEB_1)
+    stream4 = RTSPStreamReader(RTSP_AEB_2)
+    stream5 = RTSPStreamReader(RTSP_GYM_1)
+    stream6 = RTSPStreamReader(RTSP_GYM_2)
 
     parking_manager_s1 = ParkingManagement(
         model="yolo11s.pt", classes=[2], json_file="bounding_boxes_s1.json"
     )
     parking_manager_s2 = ParkingManagement(
         model="yolo11s.pt", classes=[2], json_file="bounding_boxes_s2.json"
+    )
+    parking_manager_aeb1 = ParkingManagement(
+        model="yolo11s.pt", classes=[2], json_file="bounding_boxes_aeb1.json"
+    )
+    parking_manager_aeb2 = ParkingManagement(
+        model="yolo11s.pt", classes=[2], json_file="bounding_boxes_aeb2.json"
+    )
+    parking_manager_gym1 = ParkingManagement(
+        model="yolo11s.pt", classes=[2], json_file="bounding_boxes_gym1.json"
+    )
+    parking_manager_gym2 = ParkingManagement(
+        model="yolo11s.pt", classes=[2], json_file="bounding_boxes_gym2.json"
     )
 
     FRAME_WIDTH, FRAME_HEIGHT = 1080, 600
@@ -132,6 +168,10 @@ def main_cv_loop():
         while True:
             ret1, frame1 = stream1.read()
             ret2, frame2 = stream2.read()
+            ret3, frame3 = stream3.read()
+            ret4, frame4 = stream4.read()
+            ret5, frame5 = stream5.read()
+            ret6, frame6 = stream6.read()
 
             # Process Stream 1
             if ret1 and frame1 is not None:
@@ -139,12 +179,12 @@ def main_cv_loop():
                 processed_s1 = parking_manager_s1.process_data(im01)
                 occ1 = parking_manager_s1.pr_info.get("Occupancy", 0)
                 empty1 = parking_manager_s1.pr_info.get("Available", 0)
-                parking_stats["camera_1"] = {"occupied": occ1, "available": empty1, "total": occ1 + empty1}
+                parking_data["lot"]["camera_1"] = {"occupied": occ1, "available": empty1, "total": occ1 + empty1}
             else:
                 processed_s1 = np.zeros((FRAME_HEIGHT, FRAME_WIDTH, 3), dtype=np.uint8)
                 cv2.putText(processed_s1, "Camera 1 Offline", (100, FRAME_HEIGHT // 2), 
                             cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
-                parking_stats["camera_1"] = {"occupied": 0, "available": 0, "total": 0}
+                parking_data["lot"]["camera_1"] = {"occupied": 0, "available": 0, "total": 0}
 
             # Process Stream 2
             if ret2 and frame2 is not None:
@@ -152,33 +192,100 @@ def main_cv_loop():
                 processed_s2 = parking_manager_s2.process_data(im02)
                 occ2 = parking_manager_s2.pr_info.get("Occupancy", 0)
                 empty2 = parking_manager_s2.pr_info.get("Available", 0)
-                parking_stats["camera_2"] = {"occupied": occ2, "available": empty2, "total": occ2 + empty2}
+                parking_data["lot"]["camera_2"] = {"occupied": occ2, "available": empty2, "total": occ2 + empty2}
             else:
                 processed_s2 = np.zeros((FRAME_HEIGHT, FRAME_WIDTH, 3), dtype=np.uint8)
                 cv2.putText(processed_s2, "Camera 2 Offline", (100, FRAME_HEIGHT // 2), 
                             cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
-                parking_stats["camera_2"] = {"occupied": 0, "available": 0, "total": 0}
+                parking_data["lot"]["camera_2"] = {"occupied": 0, "available": 0, "total": 0}
 
-            # Aggregating Lot Statistics (remains identical)
-            t_occupied = parking_stats["camera_1"]["occupied"] + parking_stats["camera_2"]["occupied"]
-            t_available = parking_stats["camera_1"]["available"] + parking_stats["camera_2"]["available"]
-            parking_stats["total_lot"] = {"occupied": t_occupied, "available": t_available, "total": t_occupied + t_available}
+            # Process Stream 3 (AEB 1)
+            if ret3 and frame3 is not None:
+                im03 = cv2.resize(frame3, (FRAME_WIDTH, FRAME_HEIGHT))
+                processed_s3 = parking_manager_aeb1.process_data(im03)
+                occ3 = parking_manager_aeb1.pr_info.get("Occupancy", 0)
+                empty3 = parking_manager_aeb1.pr_info.get("Available", 0)
+                parking_data["aeb"]["camera_aeb1"] = {"occupied": occ3, "available": empty3, "total": occ3 + empty3}
+            else:
+                processed_s3 = np.zeros((FRAME_HEIGHT, FRAME_WIDTH, 3), dtype=np.uint8)
+                cv2.putText(processed_s3, "Camera AEB 1 Offline", (100, FRAME_HEIGHT // 2), 
+                            cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+                parking_data["aeb"]["camera_aeb1"] = {"occupied": 0, "available": 0, "total": 0}
 
-            # Write to thread-safe separate camera pointers
+            # Process Stream 4 (AEB 2)
+            if ret4 and frame4 is not None:
+                im04 = cv2.resize(frame4, (FRAME_WIDTH, FRAME_HEIGHT))
+                processed_s4 = parking_manager_aeb2.process_data(im04)
+                occ4 = parking_manager_aeb2.pr_info.get("Occupancy", 0)
+                empty4 = parking_manager_aeb2.pr_info.get("Available", 0)
+                parking_data["aeb"]["camera_aeb2"] = {"occupied": occ4, "available": empty4, "total": occ4 + empty4}
+            else:
+                processed_s4 = np.zeros((FRAME_HEIGHT, FRAME_WIDTH, 3), dtype=np.uint8)
+                cv2.putText(processed_s4, "Camera AEB 2 Offline", (100, FRAME_HEIGHT // 2), 
+                            cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+                parking_data["aeb"]["camera_aeb2"] = {"occupied": 0, "available": 0, "total": 0}
+
+              # Process Stream 5 (GYM 1)
+            if ret5 and frame5 is not None:
+                im05 = cv2.resize(frame5, (FRAME_WIDTH, FRAME_HEIGHT))
+                processed_s5 = parking_manager_gym1.process_data(im05)
+                occ5 = parking_manager_gym1.pr_info.get("Occupancy", 0)
+                empty5 = parking_manager_gym1.pr_info.get("Available", 0)
+                parking_data["gym"]["camera_gym1"] = {"occupied": occ5, "available": empty5, "total": occ5 + empty5}
+            else:
+                processed_s5 = np.zeros((FRAME_HEIGHT, FRAME_WIDTH, 3), dtype=np.uint8)
+                cv2.putText(processed_s5, "Camera GYM 1 Offline", (100, FRAME_HEIGHT // 2), 
+                            cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+                parking_data["gym"]["camera_gym1"] = {"occupied": 0, "available": 0, "total": 0}
+
+            # Process Stream 6 (GYM 2)
+            if ret6 and frame6 is not None:
+                im06 = cv2.resize(frame6, (FRAME_WIDTH, FRAME_HEIGHT))
+                processed_s6 = parking_manager_gym2.process_data(im06)
+                occ6 = parking_manager_gym2.pr_info.get("Occupancy", 0)
+                empty6 = parking_manager_gym2.pr_info.get("Available", 0)
+                parking_data["gym"]["camera_gym2"] = {"occupied": occ6, "available": empty6, "total": occ6 + empty6}
+            else:
+                processed_s6 = np.zeros((FRAME_HEIGHT, FRAME_WIDTH, 3), dtype=np.uint8)
+                cv2.putText(processed_s6, "Camera GYM 2 Offline", (100, FRAME_HEIGHT // 2), 
+                            cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+                parking_data["gym"]["camera_gym2"] = {"occupied": 0, "available": 0, "total": 0}    
+
+            # Aggregate Lot Statistics
+            t_occupied = parking_data["lot"]["camera_1"]["occupied"] + parking_data["lot"]["camera_2"]["occupied"]
+            t_available = parking_data["lot"]["camera_1"]["available"] + parking_data["lot"]["camera_2"]["available"]
+            parking_data["lot"]["total"] = {"occupied": t_occupied, "available": t_available, "total": t_occupied + t_available}
+
+            # Aggregate AEB Statistics
+            t_occupied_aeb = parking_data["aeb"]["camera_aeb1"]["occupied"] + parking_data["aeb"]["camera_aeb2"]["occupied"]
+            t_available_aeb = parking_data["aeb"]["camera_aeb1"]["available"] + parking_data["aeb"]["camera_aeb2"]["available"]
+            parking_data["aeb"]["total"] = {"occupied": t_occupied_aeb, "available": t_available_aeb, "total": t_occupied_aeb + t_available_aeb}
+
+            # Aggregate GYM Statistics
+            t_occupied_gym = parking_data["gym"]["camera_gym1"]["occupied"] + parking_data["gym"]["camera_gym2"]["occupied"]
+            t_available_gym = parking_data["gym"]["camera_gym1"]["available"] + parking_data["gym"]["camera_gym2"]["available"]
+            parking_data["gym"]["total"] = {"occupied": t_occupied_gym, "available": t_available_gym, "total": t_occupied_gym + t_available_gym}
+
+            # Thread-safe copy of processed frames to global pointers
             with frame_lock:
                 output_frames["camera_1"] = processed_s1.copy()
                 output_frames["camera_2"] = processed_s2.copy()
+                output_frames["camera_aeb1"] = processed_s3.copy()
+                output_frames["camera_aeb2"] = processed_s4.copy()
+                output_frames["camera_gym1"] = processed_s5.copy()
+                output_frames["camera_gym2"] = processed_s6.copy()
 
-            time.sleep(0.01) # Yield core control minorly
+            time.sleep(0.01)
     finally:
         stream1.release()
         stream2.release()
+        stream3.release()
+        stream4.release()
+        stream5.release()
+        stream6.release()
 
 if __name__ == "__main__":
     print("Launching AI backend and background web services...")
-    
     flask_thread = threading.Thread(target=run_flask, daemon=True)
     flask_thread.start()
-    
-    # Run the main loop directly on the main thread
     main_cv_loop()

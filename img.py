@@ -7,7 +7,7 @@ maxFrames = 1  # Number of frames to save
 count = 0
 
 # Replace with your RTSP URL
-rtsp_url = "rtsp://admin:%40ict2025%40@192.168.1.3:554/stream?rtsp_transport=tcp"
+rtsp_url = "rtsp://admin:%40ict2025%40@192.168.1.5:554/stream?rtsp_transport=tcp"
 
 cap = cv2.VideoCapture(rtsp_url)
 
@@ -33,7 +33,7 @@ while cpt < maxFrames:
     cv2.imshow("RTSP Stream", frame)
 
     cv2.imwrite(
-        f"D:\Dev\space/img_{cpt}.jpg",
+        f"C:/Users/ict-dev/Documents/space/img_{cpt}.jpg",
         frame
     )
 

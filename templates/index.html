@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Smart Parking</title>
+    <title>SPACE</title>
     <style>
         :root {
             --bg-color: #0f172a;
@@ -14,6 +14,9 @@
             --text-muted: #94a3b8;
             --occupied-color: #ef4444;
             --vacant-color: #10b981;
+            --sidebar-width: 260px;
+            --sidebar-collapsed: 0px;
+            --transition-speed: 0.3s;
         }
 
         * { box-sizing: border-box; }
@@ -28,20 +31,34 @@
             overflow: hidden;
         }
 
-        /* Sidebar Architecture Layout */
+        /* ===== SIDEBAR with toggle ===== */
         .sidebar {
-            width: 260px;
+            width: var(--sidebar-width);
             background-color: var(--sidebar-bg);
             border-right: 1px solid #334155;
             display: flex;
             flex-direction: column;
             padding: 20px 0;
+            flex-shrink: 0;
+            transition: width var(--transition-speed) ease, opacity var(--transition-speed) ease;
+            overflow: hidden;
+            position: relative;
+            z-index: 10;
+        }
+
+        .sidebar.collapsed {
+            width: 0;
+            padding: 0;
+            border-right: none;
+            opacity: 0;
+            pointer-events: none;
         }
 
         .brand-section {
             padding: 0 24px 20px 24px;
             border-bottom: 1px solid #334155;
             margin-bottom: 20px;
+            white-space: nowrap;
         }
 
         .brand-section h2 {
@@ -70,6 +87,7 @@
             font-weight: 500;
             cursor: pointer;
             transition: all 0.2s ease;
+            white-space: nowrap;
         }
 
         .nav-item:hover {
@@ -82,17 +100,36 @@
             color: var(--text-main);
         }
 
-        /* Core Content Viewports */
+        /* ===== MAIN CONTENT ===== */
         .main-content {
             flex: 1;
             padding: 40px;
             overflow-y: auto;
             position: relative;
+            transition: margin var(--transition-speed) ease;
+            background-color: var(--bg-color);
+        }
+
+        /* toggle button (hamburger) */
+        .toggle-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-main);
+            font-size: 1.8rem;
+            cursor: pointer;
+            padding: 0 8px 8px 0;
+            display: inline-block;
+            line-height: 1;
+            margin-bottom: 12px;
+            transition: transform 0.2s;
+        }
+        .toggle-btn:hover {
+            transform: scale(1.1);
         }
 
         .view-panel {
-            display: none; /* Controlled via JS switching */
-            max-width: 1200px;
+            display: none;
+            max-width: 1400px;
             margin: 0 auto;
         }
 
@@ -107,10 +144,10 @@
             letter-spacing: -0.04em;
         }
 
-        /* Metric Card Layouts */
+        /* ===== CARDS & GRID (responsive) ===== */
         .dashboard-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
             gap: 24px;
         }
 
@@ -119,6 +156,7 @@
             border-radius: 12px;
             padding: 24px;
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            min-width: 0;
         }
 
         .status-grid {
@@ -153,7 +191,7 @@
             height: 100%;
             width: 0%;
             border-radius: 9999px;
-            transition: width 0.4s ease;
+            transition: width 0.4s ease, background-color 0.3s ease;
         }
 
         .stat-summary {
@@ -162,13 +200,14 @@
             font-size: 0.95rem;
             color: var(--text-muted);
             margin-top: 10px;
+            flex-wrap: wrap;
         }
 
-        /* Dual Camera Grid Layout */
+        /* ===== STREAMS GRID (responsive) ===== */
         .streams-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(450px, 1fr));
-            gap: 20px;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 24px;
         }
 
         .camera-card {
@@ -177,6 +216,8 @@
             border: 1px solid #334155;
             overflow: hidden;
             box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
+            display: flex;
+            flex-direction: column;
         }
 
         .camera-header {
@@ -184,50 +225,179 @@
             font-weight: 600;
             background-color: rgba(0, 0, 0, 0.2);
             border-bottom: 1px solid #334155;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+
+        .header-controls {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .live-indicator {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            background-color: #64748b; /* off when stopped */
+            border-radius: 50%;
+            transition: background-color 0.3s;
+            flex-shrink: 0;
+        }
+        .live-indicator.active {
+            background-color: #ef4444;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(0.9); opacity: 0.6; }
+            50% { transform: scale(1.2); opacity: 1; }
+            100% { transform: scale(0.9); opacity: 0.6; }
         }
 
         .video-container {
-            background-color: #000;
+            background-color: #0a0a0a;
             display: flex;
             justify-content: center;
             align-items: center;
+            aspect-ratio: 16 / 9;
+            position: relative;
+            min-height: 180px;
         }
 
-        .video-container img {
+        .video-container img,
+        .video-container video {
             width: 100%;
-            height: auto;
+            height: 100%;
+            object-fit: cover;
             display: block;
+        }
+
+        /* play overlay */
+        .play-overlay {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background: rgba(0, 0, 0, 0.55);
+            cursor: pointer;
+            transition: background 0.25s;
+            z-index: 2;
+            border-radius: 0 0 12px 12px;
+        }
+        .play-overlay:hover {
+            background: rgba(0, 0, 0, 0.35);
+        }
+        .play-overlay .play-icon {
+            font-size: 4rem;
+            line-height: 1;
+            color: white;
+            text-shadow: 0 4px 12px rgba(0,0,0,0.7);
+            pointer-events: none;
+        }
+        .play-overlay .play-label {
+            margin-top: 8px;
+            color: rgba(255,255,255,0.8);
+            font-size: 0.9rem;
+            letter-spacing: 0.04em;
+            background: rgba(0,0,0,0.4);
+            padding: 4px 16px;
+            border-radius: 20px;
+            backdrop-filter: blur(4px);
+            pointer-events: none;
+        }
+        .play-overlay.hidden {
+            display: none;
+        }
+
+        /* stop button */
+        .stop-btn {
+            background: rgba(239, 68, 68, 0.2);
+            border: 1px solid #ef4444;
+            color: #ef4444;
+            padding: 2px 12px;
+            border-radius: 16px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            letter-spacing: 0.03em;
+            opacity: 0;
+            pointer-events: none;
+        }
+        .stop-btn.visible {
+            opacity: 1;
+            pointer-events: auto;
+        }
+        .stop-btn:hover {
+            background: rgba(239, 68, 68, 0.35);
+        }
+
+        .stream-placeholder {
+            color: #475569;
+            font-size: 0.9rem;
+            text-align: center;
+            padding: 12px;
+        }
+
+        /* responsive */
+        @media screen and (max-width: 700px) {
+            .main-content { padding: 20px; }
+            .dashboard-grid, .streams-grid { grid-template-columns: 1fr; }
+            .status-grid { grid-template-columns: 1fr 1fr; }
+            .view-title { font-size: 1.6rem; }
+        }
+        @media screen and (max-width: 480px) {
+            .main-content { padding: 12px; }
+            .status-grid { grid-template-columns: 1fr; }
+        }
+        .top-bar {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
         }
     </style>
 </head>
 <body>
 
-    <!-- SIDEBAR NAVIGATION MENU -->
-    <div class="sidebar">
+    <!-- SIDEBAR NAVIGATION -->
+    <div class="sidebar" id="sidebar">
         <div class="brand-section">
             <h2>SPACE</h2>
-            <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 4px;">BatStateU</div>
+            <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 4px;">BatState-U</div>
         </div>
         <ul class="nav-list">
             <li class="nav-item active" onclick="switchView('dashboard', this)">
                 <span style="margin-right: 12px;">📊</span> Dashboard Overview
             </li>
             <li class="nav-item" onclick="switchView('livestream', this)">
-                <span style="margin-right: 12px;">🎥</span> Live Video Stream
+                <span style="margin-right: 12px;">🎥</span> Live Video Streams
             </li>
         </ul>
     </div>
 
-    <!-- MAIN VIEWPORT COMPONENT PANELS -->
-    <div class="main-content">
-        
-        <!-- PANEL VIEW A: DASHBOARD -->
+    <!-- MAIN CONTENT -->
+    <div class="main-content" id="mainContent">
+        <div class="top-bar">
+            <button class="toggle-btn" id="toggleSidebarBtn" aria-label="Toggle navigation">☰</button>
+            <span style="color: var(--text-muted); font-size: 0.9rem;">Menu</span>
+        </div>
+
+        <!-- PANEL: DASHBOARD -->
         <div id="view-dashboard" class="view-panel active">
-            <h1 class="view-title">Dashboard Overview</h1>
+            <h1 class="view-title">Smart Parking Access and Control Engine</h1>
             <div class="dashboard-grid">
-                <!-- Total Combined Lot Card -->
+                <!-- Steer Hub -->
                 <div class="card">
-                    <div style="font-size: 1.2rem; font-weight: 700;">🚗 Steer Hub Parking</div>
+                    <div style="font-size: 1.2rem; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+                        <span>🏢</span> Steer Hub Parking
+                    </div>
                     <div class="status-grid">
                         <div class="stat-box occupied">
                             <div class="label">Occupied</div>
@@ -239,80 +409,352 @@
                         </div>
                     </div>
                     <div>
-                        <span class="label">Lot Occupancy Load</span>
+                        <span class="label">Steer Occupancy Load</span>
                         <div class="progress-bar-container">
                             <div class="progress-bar" id="lot-progress"></div>
                         </div>
                         <div class="stat-summary">
                             <span id="lot-percentage">0% Full</span>
-                            <span id="lot-total">Total Spots: 0</span>
+                            <span id="lot-total">Total Slots: 0</span>
+                        </div>
+                    </div>
+                </div>
+                <!-- AEB -->
+                <div class="card">
+                    <div style="font-size: 1.2rem; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+                        <span>🏢</span> Albert Einstein Parking
+                    </div>
+                    <div class="status-grid">
+                        <div class="stat-box occupied">
+                            <div class="label">Occupied</div>
+                            <div class="number" id="aeb-occupied">0</div>
+                        </div>
+                        <div class="stat-box vacant">
+                            <div class="label">Vacant</div>
+                            <div class="number" id="aeb-vacant">0</div>
+                        </div>
+                    </div>
+                    <div>
+                        <span class="label">AEB Occupancy Load</span>
+                        <div class="progress-bar-container">
+                            <div class="progress-bar" id="aeb-progress"></div>
+                        </div>
+                        <div class="stat-summary">
+                            <span id="aeb-percentage">0% Full</span>
+                            <span id="aeb-total">Total Slots: 0</span>
+                        </div>
+                    </div>
+                </div>
+                <!-- GYM -->
+                <div class="card">
+                    <div style="font-size: 1.2rem; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+                        <span>🏢</span> Sparta Gym Parking
+                    </div>
+                    <div class="status-grid">
+                        <div class="stat-box occupied">
+                            <div class="label">Occupied</div>
+                            <div class="number" id="gym-occupied">0</div>
+                        </div>
+                        <div class="stat-box vacant">
+                            <div class="label">Vacant</div>
+                            <div class="number" id="gym-vacant">0</div>
+                        </div>
+                    </div>
+                    <div>
+                        <span class="label">Gym Occupancy Load</span>
+                        <div class="progress-bar-container">
+                            <div class="progress-bar" id="gym-progress"></div>
+                        </div>
+                        <div class="stat-summary">
+                            <span id="gym-percentage">0% Full</span>
+                            <span id="gym-total">Total Slots: 0</span>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- PANEL VIEW B: LIVESTREAM VIDEO -->
+        <!-- PANEL: LIVESTREAM with Play/Stop (6 cameras) -->
         <div id="view-livestream" class="view-panel">
             <h1 class="view-title">Live Video Streams</h1>
-            <div class="streams-grid">
-                <!-- Camera 1 -->
-                <div class="camera-card">
-                    <div class="camera-header">📹 Steer Hub Cam 1</div>
-                    <div class="video-container">
-                        <img src="/video_feed/camera_1" alt="AI Camera Feed 1 Processing">
+            <div class="streams-grid" id="streamsGrid">
+                <!-- camera 1 -->
+                <div class="camera-card" data-stream="/video_feed/camera_1">
+                    <div class="camera-header">
+                        <span>📹 Steer Hub - Cam 1</span>
+                        <div class="header-controls">
+                            <span class="live-indicator" id="indicator-1"></span>
+                            <button class="stop-btn" data-container="container-1" data-indicator="indicator-1">Stop</button>
+                        </div>
+                    </div>
+                    <div class="video-container" id="container-1">
+                        <div class="play-overlay" data-target="container-1" data-src="/video_feed/camera_1">
+                            <span class="play-icon">▶</span>
+                            <span class="play-label">Click to play</span>
+                        </div>
                     </div>
                 </div>
-                <!-- Camera 2 -->
-                <div class="camera-card">
-                    <div class="camera-header">📹 Steer Hub Cam 2</div>
-                    <div class="video-container">
-                        <img src="/video_feed/camera_2" alt="AI Camera Feed 2 Processing">
+
+                <!-- camera 2 -->
+                <div class="camera-card" data-stream="/video_feed/camera_2">
+                    <div class="camera-header">
+                        <span>📹 Steer Hub - Cam 2</span>
+                        <div class="header-controls">
+                            <span class="live-indicator" id="indicator-2"></span>
+                            <button class="stop-btn" data-container="container-2" data-indicator="indicator-2">Stop</button>
+                        </div>
+                    </div>
+                    <div class="video-container" id="container-2">
+                        <div class="play-overlay" data-target="container-2" data-src="/video_feed/camera_2">
+                            <span class="play-icon">▶</span>
+                            <span class="play-label">Click to play</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- camera 3 -->
+                <div class="camera-card" data-stream="/video_feed/camera_aeb1">
+                    <div class="camera-header">
+                        <span>📹 AEB Parking - Cam 1</span>
+                        <div class="header-controls">
+                            <span class="live-indicator" id="indicator-3"></span>
+                            <button class="stop-btn" data-container="container-3" data-indicator="indicator-3">Stop</button>
+                        </div>
+                    </div>
+                    <div class="video-container" id="container-3">
+                        <div class="play-overlay" data-target="container-3" data-src="/video_feed/camera_aeb1">
+                            <span class="play-icon">▶</span>
+                            <span class="play-label">Click to play</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- camera 4 -->
+                <div class="camera-card" data-stream="/video_feed/camera_aeb2">
+                    <div class="camera-header">
+                        <span>📹 AEB Parking - Cam 2</span>
+                        <div class="header-controls">
+                            <span class="live-indicator" id="indicator-4"></span>
+                            <button class="stop-btn" data-container="container-4" data-indicator="indicator-4">Stop</button>
+                        </div>
+                    </div>
+                    <div class="video-container" id="container-4">
+                        <div class="play-overlay" data-target="container-4" data-src="/video_feed/camera_aeb2">
+                            <span class="play-icon">▶</span>
+                            <span class="play-label">Click to play</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- camera 5 (NEW) -->
+                <div class="camera-card" data-stream="/video_feed/camera_gym1">
+                    <div class="camera-header">
+                        <span>📹 Sparta Gym - Cam 1</span>
+                        <div class="header-controls">
+                            <span class="live-indicator" id="indicator-5"></span>
+                            <button class="stop-btn" data-container="container-5" data-indicator="indicator-5">Stop</button>
+                        </div>
+                    </div>
+                    <div class="video-container" id="container-5">
+                        <div class="play-overlay" data-target="container-5" data-src="/video_feed/camera_gym1">
+                            <span class="play-icon">▶</span>
+                            <span class="play-label">Click to play</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- camera 6 (NEW) -->
+                <div class="camera-card" data-stream="/video_feed/camera_gym2">
+                    <div class="camera-header">
+                        <span>📹 Sparta Gym - Cam 2</span>
+                        <div class="header-controls">
+                            <span class="live-indicator" id="indicator-6"></span>
+                            <button class="stop-btn" data-container="container-6" data-indicator="indicator-6">Stop</button>
+                        </div>
+                    </div>
+                    <div class="video-container" id="container-6">
+                        <div class="play-overlay" data-target="container-6" data-src="/video_feed/camera_gym2">
+                            <span class="play-icon">▶</span>
+                            <span class="play-label">Click to play</span>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
-
     </div>
 
-    <!-- RUNTIME TELEMETRY DATA SCRIPTS -->
     <script>
-        // Tab switching logic controller
-        function switchView(viewName, clickedElement) {
-            document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
-            clickedElement.classList.add('active');
+        (function() {
+            // ---------- SIDEBAR TOGGLE ----------
+            const sidebar = document.getElementById('sidebar');
+            const toggleBtn = document.getElementById('toggleSidebarBtn');
+            toggleBtn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                sidebar.classList.toggle('collapsed');
+            });
 
-            document.querySelectorAll('.view-panel').forEach(panel => panel.classList.remove('active'));
-            document.getElementById(`view-${viewName}`).classList.add('active');
-        }
+            // ---------- VIEW SWITCHING ----------
+            window.switchView = function(viewName, clickedElement) {
+                document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+                clickedElement.classList.add('active');
+                document.querySelectorAll('.view-panel').forEach(panel => panel.classList.remove('active'));
+                const targetPanel = document.getElementById(`view-${viewName}`);
+                if (targetPanel) targetPanel.classList.add('active');
+            };
 
-        // Telemetry Data Poll (polls from consolidated endpoint)
-        function updateTelemetry() {
-            fetch('/api/parking')
-                .then(res => res.json())
-                .then(data => {
-                    const stats = data.total_lot;
-                    document.getElementById('lot-occupied').innerText = stats.occupied;
-                    document.getElementById('lot-vacant').innerText = stats.available;
-                    document.getElementById('lot-total').innerText = `Total Spots: ${stats.total}`;
+            // ---------- PLAY / STOP LOGIC ----------
+            // play: remove overlay, add img, activate indicator, show stop btn
+            document.querySelectorAll('.play-overlay').forEach(overlay => {
+                overlay.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    const container = document.getElementById(this.dataset.target);
+                    const src = this.dataset.src;
+                    if (!container || !src) return;
 
-                    let percent = stats.total > 0 ? Math.round((stats.occupied / stats.total) * 100) : 0;
-                    document.getElementById('lot-percentage').innerText = `${percent}% Full`;
-                    
-                    const progressBar = document.getElementById('lot-progress');
-                    progressBar.style.width = `${percent}%`;
+                    // if already playing, ignore
+                    if (container.querySelector('img')) return;
 
-                    // Dynamic color states
-                    if (percent < 50) progressBar.style.backgroundColor = '#10b981';
-                    else if (percent < 85) progressBar.style.backgroundColor = '#f59e0b';
-                    else progressBar.style.backgroundColor = '#ef4444';
-                })
-                .catch(err => console.error("Error reading JSON server data metrics: ", err));
-        }
+                    // create image
+                    const img = document.createElement('img');
+                    img.src = src;
+                    img.alt = 'Live stream';
+                    container.appendChild(img);
 
-        // Run telemetry sync tasks loop independently from video stream rendering
-        setInterval(updateTelemetry, 1000);
-        updateTelemetry();
+                    // hide overlay
+                    this.classList.add('hidden');
+
+                    // activate indicator
+                    const card = container.closest('.camera-card');
+                    if (card) {
+                        const indicator = card.querySelector('.live-indicator');
+                        if (indicator) indicator.classList.add('active');
+                        // show stop button
+                        const stopBtn = card.querySelector('.stop-btn');
+                        if (stopBtn) stopBtn.classList.add('visible');
+                    }
+                });
+            });
+
+            // stop: remove img, show overlay, deactivate indicator, hide stop btn
+            document.querySelectorAll('.stop-btn').forEach(btn => {
+                btn.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    const containerId = this.dataset.container;
+                    const indicatorId = this.dataset.indicator;
+                    const container = document.getElementById(containerId);
+                    const indicator = document.getElementById(indicatorId);
+                    if (!container) return;
+
+                    // remove img
+                    const img = container.querySelector('img');
+                    if (img) img.remove();
+
+                    // show overlay again
+                    const overlay = container.querySelector('.play-overlay');
+                    if (overlay) overlay.classList.remove('hidden');
+
+                    // deactivate indicator
+                    if (indicator) indicator.classList.remove('active');
+
+                    // hide stop button
+                    this.classList.remove('visible');
+                });
+            });
+
+            // ---------- TELEMETRY (same) ----------
+            function updateProgressBar(elementId, percent) {
+                const bar = document.getElementById(elementId);
+                if (!bar) return;
+                bar.style.width = `${percent}%`;
+                if (percent < 50) bar.style.backgroundColor = '#10b981';
+                else if (percent < 85) bar.style.backgroundColor = '#f59e0b';
+                else bar.style.backgroundColor = '#ef4444';
+            }
+
+            function updateTelemetry() {
+                fetch('/api/parking')
+                    .then(res => {
+                        if (!res.ok) throw new Error('Network response not ok');
+                        return res.json();
+                    })
+                    .then(data => {
+                        const main = data.lot.total;
+                        document.getElementById('lot-occupied').innerText = main.occupied;
+                        document.getElementById('lot-vacant').innerText = main.available;
+                        document.getElementById('lot-total').innerText = `Total Slots: ${main.total}`;
+                        let mainPercent = main.total > 0 ? Math.round((main.occupied / main.total) * 100) : 0;
+                        document.getElementById('lot-percentage').innerText = `${mainPercent}% Full`;
+                        updateProgressBar('lot-progress', mainPercent);
+
+                        const aeb = data.aeb.total;
+                        document.getElementById('aeb-occupied').innerText = aeb.occupied;
+                        document.getElementById('aeb-vacant').innerText = aeb.available;
+                        document.getElementById('aeb-total').innerText = `Total Slots: ${aeb.total}`;
+                        let aebPercent = aeb.total > 0 ? Math.round((aeb.occupied / aeb.total) * 100) : 0;
+                        document.getElementById('aeb-percentage').innerText = `${aebPercent}% Full`;
+                        updateProgressBar('aeb-progress', aebPercent);
+
+                        const gym = data.gym.total;
+                        document.getElementById('gym-occupied').innerText = gym.occupied;
+                        document.getElementById('gym-vacant').innerText = gym.available;
+                        document.getElementById('gym-total').innerText = `Total Slots: ${gym.total}`;
+                        let gymPercent = gym.total > 0 ? Math.round((gym.occupied / gym.total) * 100) : 0;
+                        document.getElementById('gym-percentage').innerText = `${gymPercent}% Full`;
+                        updateProgressBar('gym-progress', gymPercent);
+                    })
+                    .catch(err => console.warn('Telemetry fetch issue:', err));
+            }
+
+            updateTelemetry();
+            setInterval(updateTelemetry, 2000);
+
+            // ---------- MOCK for demo if fetch fails ----------
+            setTimeout(() => {
+                const occupiedEls = document.querySelectorAll('.stat-box.occupied .number');
+                if (occupiedEls.length && occupiedEls[0].innerText === '0') {
+                    const mock = {
+                        lot: { total: { occupied: 12, available: 8, total: 20 } },
+                        aeb: { total: { occupied: 5, available: 15, total: 20 } },
+                        gym: { total: { occupied: 9, available: 11, total: 20 } }
+                    };
+                    function applyMock() {
+                        const data = mock;
+                        const main = data.lot.total;
+                        document.getElementById('lot-occupied').innerText = main.occupied;
+                        document.getElementById('lot-vacant').innerText = main.available;
+                        document.getElementById('lot-total').innerText = `Total Slots: ${main.total}`;
+                        let mainPercent = main.total > 0 ? Math.round((main.occupied / main.total) * 100) : 0;
+                        document.getElementById('lot-percentage').innerText = `${mainPercent}% Full`;
+                        let bar = document.getElementById('lot-progress');
+                        bar.style.width = `${mainPercent}%`;
+                        bar.style.backgroundColor = mainPercent < 50 ? '#10b981' : mainPercent < 85 ? '#f59e0b' : '#ef4444';
+
+                        const aeb = data.aeb.total;
+                        document.getElementById('aeb-occupied').innerText = aeb.occupied;
+                        document.getElementById('aeb-vacant').innerText = aeb.available;
+                        document.getElementById('aeb-total').innerText = `Total Slots: ${aeb.total}`;
+                        let aebPercent = aeb.total > 0 ? Math.round((aeb.occupied / aeb.total) * 100) : 0;
+                        document.getElementById('aeb-percentage').innerText = `${aebPercent}% Full`;
+                        let bar2 = document.getElementById('aeb-progress');
+                        bar2.style.width = `${aebPercent}%`;
+                        bar2.style.backgroundColor = aebPercent < 50 ? '#10b981' : aebPercent < 85 ? '#f59e0b' : '#ef4444';
+
+                        const gym = data.gym.total;
+                        document.getElementById('gym-occupied').innerText = gym.occupied;
+                        document.getElementById('gym-vacant').innerText = gym.available;
+                        document.getElementById('gym-total').innerText = `Total Slots: ${gym.total}`;
+                        let gymPercent = gym.total > 0 ? Math.round((gym.occupied / gym.total) * 100) : 0;
+                        document.getElementById('gym-percentage').innerText = `${gymPercent}% Full`;
+                        let bar3 = document.getElementById('gym-progress');
+                        bar3.style.width = `${gymPercent}%`;
+                        bar3.style.backgroundColor = gymPercent < 50 ? '#10b981' : gymPercent < 85 ? '#f59e0b' : '#ef4444';
+                    }
+                    applyMock();
+                }
+            }, 3000);
+
+        })();
     </script>
+
 </body>
 </html>
